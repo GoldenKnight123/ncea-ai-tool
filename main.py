@@ -1,5 +1,5 @@
 import pygame
-from buttons import BasicButton
+from utilities import *
 
 #This class handles all processes in the program, including the screen
 #It updates the screen, draws the screen, and handles events and also maintains the clock responsible for fps
@@ -30,6 +30,8 @@ class MainHandler:
                 self.running = False
         
         self.screen.events(events)
+        for i in self.objects:
+            i.events(events)
 
     def run(self):
         while self.running:
@@ -69,5 +71,11 @@ class MainScreen:
 if __name__ == '__main__':
     screen = MainScreen()
     app = MainHandler(screen)
+    test_button = BasicButton((100, 50), (100, 100), "Test", pygame.font.Font("Kanit-Regular.ttf", 24), (0, 0, 255), (0, 0, 170), None)
+    app.addObject(test_button)
+    test_dropbox = DropDown((100, 50), (100, 100), ["Test", "Test2", "Test3"], pygame.font.Font("Kanit-Regular.ttf", 24), (255, 255, 255), (192, 192, 192), (100, 100, 100))
+    test_editbox = EditBox((100, 50), (100, 200), "Test", pygame.font.Font("Kanit-Regular.ttf", 24), (255, 255, 255), (192, 192, 192), (100, 100, 100), (0, 0, 0), 10)
+    app.addObject(test_dropbox)
+    app.addObject(test_editbox)
     app.run()
     pygame.quit()
