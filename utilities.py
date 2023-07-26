@@ -5,13 +5,14 @@ import pygame
 #pos: tuple (x, y)
 #colours: tuple (R, G, B)
 class BasicButton:
-    def __init__(self, size, pos, text, font, colour, hover_colour, function):
+    def __init__(self, size, pos, text, font, colour, hover_colour, text_colour, function):
         self.size = size #tuple
         self.pos = pos #tuple
         self.text = text
         self.font = font
         self.colour = colour
         self.hover_colour = hover_colour
+        self.text_colour = text_colour
         self.function = function
         self.hovered = False
         self.clicked = False #Used to check if the button was clicked in the current frame
@@ -38,7 +39,7 @@ class BasicButton:
             pygame.draw.rect(screen, self.hover_colour, (self.pos[0], self.pos[1], self.size[0], self.size[1]), border_radius=10)
         else:
             pygame.draw.rect(screen, self.colour, (self.pos[0], self.pos[1], self.size[0], self.size[1]), border_radius=10)
-        text = self.font.render(self.text, True, (0, 0, 0))
+        text = self.font.render(self.text, True, self.text_colour)
         text_rect = text.get_rect()
         text_rect.center = (self.pos[0] + self.size[0] / 2, self.pos[1] + self.size[1] / 2)
         screen.blit(text, text_rect)
@@ -74,13 +75,13 @@ class DropDown:
             #Check if mouse is clicking on button
             if pygame.mouse.get_pressed()[0] and not self.clicked:
                 self.clicked = True #Set clicked to true so that the button can't be clicked multiple times with one click
+            
+            elif not pygame.mouse.get_pressed()[0] and self.clicked:
+                self.clicked = False
                 self.open = not self.open
 
         else:
             self.hovered = False
-
-        if not pygame.mouse.get_pressed()[0]:
-            self.clicked = False
         
         if self.open:
             for i in range(len(self.options)):
@@ -88,12 +89,19 @@ class DropDown:
                     self.hover_selection = i
                     #Check if mouse is clicking on button
                     if pygame.mouse.get_pressed()[0] and not self.clicked:
+                        print('clicked')
                         self.clicked = True
+                        print(self.clicked)
+                        
+                    #when released
+                    if not pygame.mouse.get_pressed()[0] and self.clicked:
+                        print('released')
+                        self.clicked = False
                         self.selected = i
                         self.open = False
 
-                if not pygame.mouse.get_pressed()[0]:
-                    self.clicked = False
+        if not pygame.mouse.get_pressed()[0]:
+            self.clicked = False
 
     def draw(self, screen):
         #Draw different colour if hovered or open
@@ -131,6 +139,7 @@ class DropDown:
     def events(self, events):
         pass
 
+
 class AdaptiveDropDown(DropDown):
     def __init__(self, size, pos, options_list, font, colour, border_color, hover_colour, condition):
         super().__init__(size, pos, options_list[0], font, colour, border_color, hover_colour, condition)
@@ -146,21 +155,45 @@ class AdaptiveDropDown(DropDown):
 
 #Editbox class
 class EditBox:
-    def __init__(self, size, pos, default_text, font, colour, border_colour, hover_colour, text_colour, max_length):
+    def __init__(self, size, pos, default_text, font, colour, border_colour, hover_colour, text_colour):
         self.size = size
         self.pos = pos
-        self.text = default_text
         self.font = font #Font may need to be changed to a monospace font to prevent text from going outside of box
         self.colour = colour
         self.border_colour = border_colour
         self.hover_colour = hover_colour
         self.text_colour = text_colour
-        self.max_length = max_length
         self.hovered = False
         self.clicked = False
         self.selected = False
         self.selected_display_timer = 100
         self.backspace_hold_timer = 0
+
+        self.text = []
+        temp_word = ""
+        temp_text = ""
+        for i in range(len(default_text)):
+            if default_text[i] == " ":
+                if self.font.size(temp_text + temp_word + " ")[0] >= self.size[0] - 20:
+                    self.text.append(temp_text)
+                    temp_text = temp_word
+                    temp_word = ""
+                else:
+                    temp_text += temp_word
+                    temp_word = ""
+            if default_text[i] == "\n":
+                if self.font.size(temp_text + temp_word)[0] >= self.size[0] - 20:
+                    self.text.append(temp_text)
+                    temp_text = ""
+                    temp_word = ""
+                else:
+                    self.text.append(temp_text + temp_word)
+                    temp_text = "" 
+                    temp_word = ""
+            else:
+                temp_word += default_text[i]
+        temp_text += temp_word
+        self.text.append(temp_text)
 
     def update(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -171,11 +204,15 @@ class EditBox:
             if pygame.mouse.get_pressed()[0] and not self.selected and not self.clicked:
                 self.clicked = True
                 self.selected = True
+                if self.text[0] == "Enter here..." and len(self.text) == 1:
+                    self.text[0] = ""
         else:
             self.hovered = False
             if pygame.mouse.get_pressed()[0] and not self.clicked:
                 self.clicked = True
                 self.selected = False
+                if self.text[0] == "" and len(self.text) == 1:
+                    self.text[0] = "Enter here..."
 
         if not pygame.mouse.get_pressed()[0]:
             self.clicked = False
@@ -187,7 +224,12 @@ class EditBox:
             #The timer is reset to 27 to allow more frames between each character removal
             if self.backspace_hold_timer > 30:
                 self.backspace_hold_timer = 27
-                self.text = self.text[:-1]
+                for i in range(len(self.text), 0, -1):
+                    if len(self.text[i-1]) > 0:
+                        self.text[i-1] = self.text[i-1][:-1]
+                        if len(self.text[i-1]) <= 0 and i > 1:
+                            self.text.pop(i-1)
+                        break
     
     def draw(self, screen):
         #Draw different colour if hovered
@@ -198,28 +240,30 @@ class EditBox:
             pygame.draw.rect(screen, self.colour, (self.pos[0], self.pos[1], self.size[0], self.size[1]))
             pygame.draw.rect(screen, self.border_colour, (self.pos[0], self.pos[1], self.size[0], self.size[1]), 2)
 
-        #If the object is selected, display a blinking _ at the end of the text to indicate it is selected and being edited
-        if self.selected:
-            #The blinking is controlled by a timer with 2 phases to reduce having to use another variable
-            if self.selected_display_timer <= 50 and self.selected_display_timer > 0:
-                self.selected_display_timer -= 1
-                text = self.font.render(self.text + "_", True, self.text_colour)
-            elif self.selected_display_timer <= 0:
-                self.selected_display_timer = 100
-                text = self.font.render(self.text, True, self.text_colour)
+        for i in range(len(self.text)):
+            #If the object is selected, display a blinking _ at the end of the text to indicate it is selected and being edited
+            if self.selected and i == len(self.text) - 1:
+                #The blinking is controlled by a timer with 2 phases to reduce having to use another variable
+                if self.selected_display_timer <= 50 and self.selected_display_timer > 0:
+                    self.selected_display_timer -= 1
+                    text = self.font.render(self.text[i] + "_", True, self.text_colour)
+                elif self.selected_display_timer <= 0:
+                    self.selected_display_timer = 100
+                    text = self.font.render(self.text[i], True, self.text_colour)
+                else:
+                    self.selected_display_timer -= 1
+                    text = self.font.render(self.text[i], True, self.text_colour)
             else:
-                self.selected_display_timer -= 1
-                text = self.font.render(self.text, True, self.text_colour)
-        else:
-            text = self.font.render(self.text, True, self.text_colour)
+                text = self.font.render(self.text[i], True, self.text_colour)
+            
+            text_rect = text.get_rect()
+            text_rect.left = self.pos[0] + 10
+
+            #Pad text from left
+            text_rect.centery = self.pos[1] + self.size[1] / 2
+            text_rect.top = self.pos[1] + (i + 1) * self.font.size(self.text[i])[1] - self.font.size(self.text[i])[1] + 5
+            screen.blit(text, text_rect)
         
-        text_rect = text.get_rect()
-        text_rect.left = self.pos[0] + 10
-
-        #Pad text from left
-        text_rect.centery = self.pos[1] + self.size[1] / 2
-        screen.blit(text, text_rect)
-
     def events(self, events):
         #While the editbox is selected, it will accept keyboard input
         if self.selected:
@@ -229,17 +273,27 @@ class EditBox:
                 #Timer is used to allow holding backspace to delete multiple characters
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_BACKSPACE:
-                        self.text = self.text[:-1]
+                        for i in range(len(self.text), 0, -1):
+                            if len(self.text[i-1]) > 0:
+                                self.text[i-1] = self.text[i-1][:-1]
+                                if len(self.text[i-1]) <= 0 and i > 1:
+                                    self.text.pop(i-1)
+                                break
                         self.backspace_hold_timer += 1 #Once the timer is greater than 0 it will be incremented until it reaches 30, done by the update() function
                     elif event.key == pygame.K_RETURN:
                         self.selected = False
-                    elif len(self.text) < self.max_length:
-                        self.text += event.unicode
+                    elif self.font.size(self.text[-1] + event.unicode)[0] >= self.size[0] - 20:
+                        #If there is enough vertical space
+                        if self.font.size(" ")[1] * len(self.text) < self.size[1] - 20:
+                            self.text.append(event.unicode)
+                    else:
+                        self.text[-1] += event.unicode
 
                 #Once the backspace key is released, the timer is reset
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_BACKSPACE:
                         self.backspace_hold_timer = 0
+                        
 
 #Checkbox class
 class CheckBox:
@@ -330,14 +384,13 @@ class DisplayBox:
         temp_word = ""
         temp_text = ""
         for i in range(len(text)):
-            print(self.text)
             if text[i] == " ":
                 if self.font.size(temp_text + temp_word + " ")[0] >= self.size[0] - 20:
                     self.text.append(temp_text)
-                    temp_text = temp_word + " "
+                    temp_text = temp_word
                     temp_word = ""
                 else:
-                    temp_text += temp_word + " "
+                    temp_text += temp_word
                     temp_word = ""
             if text[i] == "\n":
                 if self.font.size(temp_text + temp_word)[0] >= self.size[0] - 20:
@@ -348,10 +401,9 @@ class DisplayBox:
                     self.text.append(temp_text + temp_word)
                     temp_text = "" 
                     temp_word = ""
-
             else:
                 temp_word += text[i]
-        temp_text += temp_word + " "
+        temp_text += temp_word
         self.text.append(temp_text)
         self.clicked = False
         self.scroll_lock = False
@@ -419,8 +471,8 @@ class DisplayBox:
                 screen.blit(text, text_rect)
                 #pygame.draw.rect(screen, (255, 0, 0), (text_rect.left, text_rect.top, text_rect.width, text_rect.height), 2)
 
-        pygame.draw.rect(screen, (255, 255, 255), (self.pos[0], self.pos[1]-30, self.size[0], 30))
-        pygame.draw.rect(screen, (255, 255, 255), (self.pos[0], self.pos[1]+self.size[1], self.size[0], 30))
+        pygame.draw.rect(screen, (239, 240, 243), (self.pos[0], self.pos[1]-30, self.size[0], 30))
+        pygame.draw.rect(screen, (239, 240, 243), (self.pos[0], self.pos[1]+self.size[1], self.size[0], 30))
         pygame.draw.rect(screen, self.border_colour, (self.pos[0], self.pos[1], self.size[0], self.size[1]), 2)
 
         #draw a scroll bar on the side which is a gray dot that moves if scrolling is needed
@@ -433,3 +485,38 @@ class DisplayBox:
             for event in events:
                 if event.type == pygame.MOUSEWHEEL:
                     self.scroll -= event.y * 10
+
+    def change_text(self, text):
+        self.text = []
+        temp_word = ""
+        temp_text = ""
+        for i in range(len(text)):
+            if text[i] == " ":
+                if self.font.size(temp_text + temp_word + " ")[0] >= self.size[0] - 20:
+                    self.text.append(temp_text)
+                    temp_text = temp_word
+                    temp_word = ""
+                else:
+                    temp_text += temp_word
+                    temp_word = ""
+            if text[i] == "\n":
+                if self.font.size(temp_text + temp_word)[0] >= self.size[0] - 20:
+                    self.text.append(temp_text)
+                    temp_text = ""
+                    temp_word = ""
+                else:
+                    self.text.append(temp_text + temp_word)
+                    temp_text = "" 
+                    temp_word = ""
+            else:
+                temp_word += text[i]
+        temp_text += temp_word
+        self.text.append(temp_text)
+        self.scroll_lock = False
+        self.scroll = 0
+        #If the length of the text is greater than the size of the box, the user can scroll through it, else the scroll bar is disabled and not drawn
+        #The max scroll value is the length of the text minus the size of the box
+        if len(self.text) * self.font.size(self.text[0])[1] > self.size[1]:
+            self.max_scroll = (len(self.text) + 1) * self.font.size(self.text[0])[1] - self.size[1]
+        else:
+            self.max_scroll = -1
